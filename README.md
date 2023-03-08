@@ -13,5 +13,3 @@ Code for the AAA PRS development in the paper can be found under /prs/:
 
 Auxilliary R scripts used by the above scripts can be found under prs/R/.
 
-Code for the Time-To-Event analyses in the paper can be found under /time_to_event/: 
-

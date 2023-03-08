@@ -930,4 +930,57 @@ SumPRS_Agnostic $phenam$'_shaprs_LDpred2' $dataLocV4
 Evaluate_PRS $dataLocV4$'PRSProfiles/'$phenam$'_shaprs_LDpred2_all.sscore' $resultsLocV4$phenam'_shaprsEvaluate_PRS' # correlation_sq 0.00724 / AUC 0.722 / FULL test correlation_sq 0.00589 /  AUC 0.715
 
 
+##############################################
+# Get empirical Rho between AAAGen and UKAGS
 
+# cases= 4777
+# controls=10125
+# N_eff = 4 / (1 / cases + 1 / controls) 
+# round(N_eff) #
+
+# calculates empriical overlap between studies: load the rho into session via: source $outPutLocation$'rho'
+function GetEmpiricalRho {
+outPutLocation=$1
+pheASumstats=$2
+pheBSumstats=$3
+
+# perform meta analysis
+arguments='/home/mk907/scripts/R/metaAnalysis.R '$pheASumstats$' '$pheBSumstats$' '$outPutLocation$'_meta /home/mk907/scripts/R/shaPRS.R'
+Rscript $arguments
+
+
+# in GWAS3 IBD naive GWAS, find SNPs with p > 0.01 # this is to find the empirical correlation, we find the 'mildly to non associated' SNPS
+# otherwise we would get 
+awk '{ if ( $9 > 0.01 && NR >1) {print $3} }' $outPutLocation$'_meta' > $outPutLocation$'_unassociated'
+wc -l $outPutLocation$'_unassociated'
+# 6,933,546
+
+# Get same SNPs in the two subphenos
+# create a file with signature RSiD, Beta_CD, SE_CD, Beta_UC, SE_UC
+awk 'FNR == NR { file1[ $1 ] = $1; next; } 
+FNR <= NR { { if ( $3 in file1) { print $3"\t"$7"\t"$8 } }  }
+'  $outPutLocation$'_unassociated' $pheASumstats > $outPutLocation$'A_unassociated'
+
+awk 'FNR == NR { file1[ $1 ] = $0; next; } 
+FNR <= NR { { 
+if (FNR == 1) {print "RSid\tBeta_CD\tSE_CD\tBeta_UC\tSE_UC" }
+if ( $3 in file1) { print file1[$3]"\t"$7"\t"$8 } }  
+}
+'  $outPutLocation$'A_unassociated' $pheBSumstats > $outPutLocation$'A_B_unassociated'
+
+
+# run R script to get rho (correlation between studies,  this is a scalar)
+# quantifies the linear association between estimated coefficients, for NON-disease SNPs
+# rho = cor(Beta_CD/SE_CD, Beta_UC/SE_UC)
+arguments='/home/mk907/scripts/R/rho.R '$outPutLocation$'A_B_unassociated '$outPutLocation$'rho'
+Rscript $arguments
+
+# 
+#source $outPutLocation$'rho'
+}
+export -f GetEmpiricalRho # this makes local functions executable when bsubbed
+
+GetEmpiricalRho $rawLocV4$'empirical_overlap_AAGEN_Leicester' $rawLocV4$'AAAGen_HM3' $rawLocV4$'Leicester_HM3' # 0.0063
+# so UKAGS has 0.6% overlap
+
+# also see email by scott with subject "AAAgen summary stats"
